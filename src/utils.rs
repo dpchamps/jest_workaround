@@ -95,7 +95,7 @@ impl From<IdentOrStr> for MemberProp {
 /// Creates
 ///
 ///```js
-///
+/// 
 ///  Object.defineProperty(target, prop_name, {
 ///      ...props
 ///  });
@@ -141,19 +141,42 @@ pub(crate) fn object_define_enumerable_configurable(
     )
 }
 
+pub(crate) fn getter_effect(target: &Ident, name: &Ident, computed: bool) -> ExprStmt {
+    if computed {
+        return ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(target.clone().computed_member(name.clone())),
+        };
+    }
+
+    return ExprStmt {
+        span: DUMMY_SP,
+        expr: Box::new(target.clone().make_member(name.clone())),
+    };
+}
+
 pub(crate) fn emit_export_stmts(exports: Ident, mut prop_list: Vec<ObjPropKeyIdent>) -> Vec<Stmt> {
     match prop_list.len() {
         0 | 1 => prop_list
             .pop()
             .map(|obj_prop| {
-                object_define_enumerable_configurable(
-                    exports.as_arg(),
-                    quote_str!(obj_prop.span(), obj_prop.key()).as_arg(),
-                    prop_arrow((js_word!("get"), DUMMY_SP, obj_prop.2.clone()).into()).into(),
-                )
-                .into_stmt()
+                vec![
+                    object_define_enumerable_configurable(
+                        exports.clone().as_arg(),
+                        quote_str!(obj_prop.span(), obj_prop.key()).as_arg(),
+                        prop_arrow((js_word!("get"), DUMMY_SP, obj_prop.2.clone()).into()).into(),
+                    )
+                    .into_stmt(),
+                    getter_effect(
+                        &exports,
+                        &quote_ident!(obj_prop.span(), obj_prop.key()),
+                        false,
+                    )
+                    .into(),
+                ]
             })
             .into_iter()
+            .flat_map(|x| x)
             .collect(),
         _ => {
             let props = prop_list
@@ -202,6 +225,11 @@ pub(crate) fn esm_export() -> Function {
     )
     .into_stmt();
 
+    let block = BlockStmt {
+        span: DUMMY_SP,
+        stmts: vec![body, getter_effect(&target, &name, true).into()],
+    };
+
     let for_in_stmt: Stmt = ForInStmt {
         span: DUMMY_SP,
         left: VarDecl {
@@ -217,7 +245,7 @@ pub(crate) fn esm_export() -> Function {
         }
         .into(),
         right: Box::new(all.clone().into()),
-        body: Box::new(body),
+        body: Box::new(block.into()),
     }
     .into();
 

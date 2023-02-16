@@ -4,6 +4,7 @@ Object.defineProperty(exports, "getRedis", {
     get: ()=>getRedis,
     configurable: true
 });
+exports.getRedis;
 import memoize from "p-memoize";
 import { getConfig } from "./config";
 const getRedis = memoize(async ()=>{

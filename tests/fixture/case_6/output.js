@@ -4,4 +4,5 @@ Object.defineProperty(exports, "default", {
     get: ()=>_default,
     configurable: true
 });
+exports.default;
 const _default = 42;
